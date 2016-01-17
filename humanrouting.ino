@@ -41,8 +41,13 @@ const int STATE_START = 0;
 const int STATE_ENTER_DEST = 1;
 const int STATE_SHOW_PATH = 2;
 
+const int MAXDESTINATIONS = 3;
+const int NODESCOUNT = 9;
+
 int state = STATE_START;
-String destination = "";
+int destinationsCount = 0;
+int currentDestination = -1;
+int destinations[MAXDESTINATIONS] = { -1, -1, -1 };
 
 int pathCursor = -1;
 
@@ -108,24 +113,61 @@ class NodeObj {
    int _dir;
 };
 
+bool DestinationExists(int destination)
+{
+  for (int i = 0; i < min(destinationsCount, MAXDESTINATIONS); i++)
+  {
+    if (destinations[i] == destination) {
+      return true;
+    }
+  }
+  return false;
+}
+
+void PushDestination(int destination)
+{
+  // Exists
+  if (DestinationExists(destination)) {
+    return;
+  }
+
+  // Add Destination
+  destinations[destinationsCount] = destination;
+  destinationsCount ++;
+}
+
+void PopDestination()
+{
+  destinations[destinationsCount] = -1;
+  destinationsCount --;
+}
+
+void CleanDestinations()
+{
+  destinationsCount = 0;
+  for (int i = 0; i < MAXDESTINATIONS; i++) {
+    destinations[i] = -1;
+  }
+}
+
+String GetDestinationText()
+{
+  String t = "";
+  for (int i = 0; i < min(destinationsCount, MAXDESTINATIONS); i++)
+  {
+    t.concat(destinations[i] + 1);
+    if (i == MAXDESTINATIONS - 1) {
+      t.concat(".");
+    } else {
+      t.concat(",");
+    }
+  }
+  return t;
+}
+
 void CalculatePath()
 {
   
-}
-
-/*
- * SETUP
- */
-void setup() {
-  // put your setup code here, to run once:
-  pinMode(ledpin,OUTPUT);
-  digitalWrite(ledpin, HIGH);
-  Serial.begin(9600);
-
-  // set up the LCD's number of columns and rows:
-  lcd.begin(16, 2);
-  // Print a message to the LCD.
-  lcd.print("hello, world!");
 }
 
 String transformText(String text)
@@ -158,6 +200,22 @@ void printInput(String input)
 }
 
 /*
+ * SETUP
+ */
+void setup() {
+  // put your setup code here, to run once:
+  
+  pinMode(ledpin,OUTPUT);
+  digitalWrite(ledpin, HIGH);
+  Serial.begin(9600);
+
+  // set up the LCD's number of columns and rows:
+  lcd.begin(16, 2);
+  // Print a message to the LCD.
+  lcd.print("hello!");
+}
+
+/*
  * LOOP
  */
 void loop() {
@@ -170,8 +228,6 @@ void loop() {
       case '*':
         if (state == STATE_SHOW_PATH) {
           pathCursor = max(pathCursor - 1, -1);
-        } else if (state == STATE_ENTER_DEST) {
-          destination.concat(",");
         }
         break;
       case '#':
@@ -180,6 +236,7 @@ void loop() {
         } else if (state == STATE_ENTER_DEST) {
           // calculate path
           Serial.println("Calculate Path");
+          CalculatePath();
           state = STATE_SHOW_PATH;
         } else if (state == STATE_SHOW_PATH) {
           pathCursor = min(pathCursor + 1, 10);
@@ -188,38 +245,42 @@ void loop() {
       case 'D': 
         if (state == STATE_ENTER_DEST) {
           // Clean path
-          destination = "";
+          CleanDestinations();
+        } else if (state == STATE_SHOW_PATH) {
+          // RESET
+          state = STATE_START;
+          pathCursor = -1;
+          CleanDestinations();
         }
         break;
       case '0':
-        if (state == STATE_SHOW_PATH)
-        {
-          // RESET
-          state = STATE_START;
-          destination = "";
-          pathCursor = -1;
+        if (state == STATE_ENTER_DEST) {
+          PopDestination();
         }
-        // no break;
+        break;
       default:
         if (state == STATE_ENTER_DEST) {
-          //if (destination.length() <= 3) {
-            destination.concat(key);
-          //}
+          if ('0' < key && key <= '9') {
+            currentDestination = key - 49; 
+            PushDestination(key - 49); // '1' becomes 0
+          }
         }
     }
   }
   
   if (state == STATE_START)
   {
-    printMain("Need help?");
+    printMain("Hello! Lost?");
     printInput("Press # to start");
     return;
   }
 
   if (state == STATE_ENTER_DEST)
   {
-    printMain("EnterDestination");
-    printInput(destination);
+    String allDestinations = GetDestinationText();
+    
+    printMain("Enter & press #");
+    printInput(allDestinations);
     return;
   }
 
@@ -227,7 +288,7 @@ void loop() {
   {
     if (pathCursor < 0) {
       String maintext = "Path to ";
-      maintext.concat(destination);
+      maintext.concat(GetDestinationText());
 
       printMain(maintext);
       printInput("Next: #  Back: *");
